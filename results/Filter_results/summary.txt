@@ -1,0 +1,22 @@
+
+ =================================================================================
+      Integrated scATAC-seq Cell Filter
+      Version 1.2
+      (C) 2025 Sohyeong Cho, Janghyun Choi, Junbeom Lee, and Seong Kyu Han*
+ =================================================================================
+Filtering Summary
+Generated at: 2025-09-01 12:36:35
+
+Parameters
+- Base dir           : examples
+- chrom.sizes (rice) : work/genome.chrom.sizes
+- GTF (rice)         : work/genes.gtf
+- TSS cutoff         : 4.69
+- UMI min/max        : 5000 / 60000
+- Barcode suffix -1  : False
+
+Per-sample summary (pre/post/retention):
+Sample1_test: pre=100  post=30  retention=0.3000
+Sample2_test: pre=200  post=74  retention=0.3700
+
+TOTAL: pre=300  post=104  retention=0.3467
