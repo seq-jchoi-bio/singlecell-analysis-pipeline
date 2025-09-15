@@ -1,0 +1,124 @@
+
+ =================================================================================
+      Integrated scATAC-seq: Clustering + Annotation Pipeline
+      Version 2.9
+      (C) 2025 Sohyeong Cho, Janghyun Choi, Junbeom Lee, and Seong Kyu Han*
+ =================================================================================
+
+===Annotation Summary===
+Generated at     : 2025-09-16 07:03:10
+
+Input (pre-merged) AnnDataSet: /Users/jchoi/Desktop/Test/Filter_results/merged_doublets.h5ads
+Annotated h5ad   : /Users/jchoi/singlecell-analysis-pipeline/results/Annot_results/annot_merged_cells.h5ad
+Gene activity    : /Users/jchoi/singlecell-analysis-pipeline/results/Annot_results/annot_gene_activity.h5ad
+CSV output       : /Users/jchoi/singlecell-analysis-pipeline/results/Annot_results/annotation_results.csv
+Figures dir      : /Users/jchoi/singlecell-analysis-pipeline/results/Annot_results/Plots
+BED out dir      : /Users/jchoi/singlecell-analysis-pipeline/results/Annot_results/bed
+
+Genome:
+  - chrom.sizes  : /Users/jchoi/singlecell-analysis-pipeline/refGenome/rice/genome.chrom.sizes
+  - GTF          : /Users/jchoi/singlecell-analysis-pipeline/refGenome/rice/genes.gtf
+
+Parameters:
+
+  - USE_DIMS     : all
+  - N_NEIGHBORS  : 10
+  - N_FEATURES   : 250000
+  - TRANSFER     : auc (unknown_thresh=0.5)
+  - REF_CSV      : /Users/jchoi/singlecell-analysis-pipeline/refGenome/rice/oryza_sativa.marker_fd.csv
+  - LABEL_KEY    : celltype_id
+  - Marker filt  : log2FC≥0.5, padj≤0.05, min_n=5
+
+Cells (n_obs)    : 17240
+Features (n_vars): 748950
+Clusters (Leiden): 19
+
+Predicted cell types (counts):
+  - oryza_sativa->PO:0009005->PO:0004010: 27
+  - oryza_sativa->PO:0009005->PO:0006036: 15
+  - oryza_sativa->PO:0009005->PO:0006036->PO:0000256: 377
+  - oryza_sativa->PO:0009005->PO:0020124: 83
+  - oryza_sativa->PO:0009005->PO:0020124->PO:0005352->PO:0000272: 103
+  - oryza_sativa->PO:0009005->PO:0020124->PO:0005417: 213
+  - oryza_sativa->PO:0009005->PO:0020124->PO:0006203: 177
+  - oryza_sativa->PO:0009005->PO:0025059->PO:0000258: 71
+  - oryza_sativa->PO:0009005->PO:0025059->PO:0000258->PO:0005059: 100
+  - oryza_sativa->PO:0009005->PO:0025059->PO:0000258->PO:0005772: 287
+  - oryza_sativa->PO:0009005->PO:0025059->PO:0020123: 37
+  - oryza_sativa->PO:0009005;PO:0009025->PO:0004010->PO:0004011: 79
+  - oryza_sativa->PO:0009005;PO:0009025->PO:0005679: 163
+  - oryza_sativa->PO:0009005;PO:0009025->PO:0009015: 380
+  - oryza_sativa->PO:0009005;PO:0009025->PO:0009015->PO:0005352: 157
+  - oryza_sativa->PO:0009005;PO:0009025->PO:0009015->PO:0005417: 340
+  - oryza_sativa->PO:0009005;PO:0009025->PO:0020124: 96
+  - oryza_sativa->PO:0009005;PO:0009025->PO:0025059->PO:0005421: 1
+  - oryza_sativa->PO:0009005;PO:0009025->PO:0025059->PO:0005772;PO:0005427: 216
+  - oryza_sativa->PO:0009005;PO:0009025->PO:0025059->PO:0006025: 14
+  - oryza_sativa->PO:0009005;PO:0009025->PO:0025059->PO:0006203: 101
+  - oryza_sativa->PO:0009005;PO:0009025->PO:0025059->PO:0025407: 110
+  - oryza_sativa->PO:0009005;PO:0009025->PO:0025059->SP:0000019;PO:0005059: 84
+  - oryza_sativa->PO:0009025->PO:0004010->PO:0004011: 476
+  - oryza_sativa->PO:0009025->PO:0006016: 167
+  - oryza_sativa->PO:0009025->PO:0009015: 623
+  - oryza_sativa->PO:0009025->PO:0025059->PO:0006070: 84
+  - oryza_sativa->PO:0009049->PO:0000230: 12
+  - oryza_sativa->PO:0009049->PO:0009051: 97
+  - oryza_sativa->PO:0009049->PO:0009051->PO:0006327: 93
+  - oryza_sativa->PO:0009049->PO:0009051->PO:0009082: 555
+  - oryza_sativa->PO:0009049->PO:0020122: 97
+  - oryza_sativa->PO:0009049->SP:0000036: 2214
+  - oryza_sativa->PO:0009062->PO:0005022: 116
+  - oryza_sativa->PO:0009062->PO:0005022->SP:0000041: 304
+  - oryza_sativa->PO:0009062->PO:0009015: 2055
+  - oryza_sativa->PO:0009062->PO:0009073: 50
+  - oryza_sativa->PO:0009062->PO:0009074: 8
+  - oryza_sativa->PO:0009062->PO:0020003: 698
+  - oryza_sativa->PO:0009062->PO:0020003->SP:0000039: 164
+  - oryza_sativa->PO:0009062->PO:0020003->SP:0000040: 3413
+  - oryza_sativa->PO:0009062->PO:0020020: 114
+  - oryza_sativa->PO:0009062->PO:0020021: 125
+  - oryza_sativa->PO:0009062->SP:0000037;PO:0020023: 178
+  - oryza_sativa->PO:0009062->SP:0000038: 1828
+  - oryza_sativa->SP:0000000: 538
+
+clusterName (counts):
+  - Branch meristem: 2214
+  - CT-Ovule: 164
+  - Epidermis: 163
+  - Exodermis: 287
+  - Fiber cell: 110
+  - Inflorescence axis: 97
+  - Inflorescence meristem: 12
+  - Initial cell: 555
+  - Inner ovary wall/Outer integument: 178
+  - Integument: 125
+  - Leaf epidermis: 167
+  - Meristematic cell: 27
+  - Mesophyll: 84
+  - Mesophyll precursor/Root endodermis: 84
+  - Mestome sheath: 14
+  - Nucellus: 114
+  - Outer ovary wall: 304
+  - Ovary wall: 116
+  - Ovule: 698
+  - Parenchyma: 1
+  - Pericycle: 278
+  - Phloem: 553
+  - Protoxylem: 103
+  - Root cap: 37
+  - Root cortex: 71
+  - Root endodermis: 100
+  - Root epidermis: 15
+  - Root exodermis/Sclerenchym: 216
+  - Root hair: 377
+  - Root stele: 179
+  - S-Ovule: 3413
+  - Spikelet: 97
+  - Spikelet floret: 555
+  - Spikelet meristem: 93
+  - Stamen residue: 1828
+  - Stigma: 50
+  - Style: 8
+  - Unknow: 538
+  - Vascular tissue: 3058
+  - Xylem: 157

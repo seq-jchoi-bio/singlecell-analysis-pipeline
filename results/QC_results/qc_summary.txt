@@ -1,0 +1,22 @@
+
+ =================================================================================
+     Integrated scATAC-seq: Quality Control Pipeline
+     Version 2.2
+     (C) 2025 Sohyeong Cho, Janghyun Choi, Junbeom Lee, and Seong Kyu Han*
+ ================================================================================
+
+===== QC SUMMARY =====
+Generated at: 2025-09-15 15:34:28
+
+Base dir     : /Users/jchoi/Desktop/Test
+chrom.sizes  : /Users/jchoi/singlecell-analysis-pipeline/refGenome/rice/genome.chrom.sizes
+GTF          : /Users/jchoi/singlecell-analysis-pipeline/refGenome/rice/genes.gtf
+
+Per-sample QC table (TSV columns):
+sample	cells_total	nFrag_min	nFrag_p5	nFrag_p10	nFrag_med	nFrag_p90	nFrag_p95	nFrag_max	nFrag_mean	nFrag_sd	TSSE_min	TSSE_p5	TSSE_p10	TSSE_med	TSSE_p90	TSSE_p95	TSSE_max	TSSE_mean	TSSE_sd
+Sample1_test	10586.0	200.0	350.0	600.0	1755.0	4068.0	4866.0	12487.0	2106.105036235208	1439.8126637423352	0.26737967914438504	0.9324009324009324	1.3602442333785616	2.932551319648094	4.513887366551943	4.99913254684247	11.363636363636362	2.9502124678496755	1.2175788981764775
+Sample2_test	32646.0	200.0	205.0	211.0	287.0	2901.0	4201.5999999999985	20058.0	973.3648543151427	1448.0642028513435	0.25974025974025977	0.5865102639296188	0.6493506493506493	1.5810276679841897	3.6600013046764976	4.195804195804195	8.333333333333332	1.9089135831218762	1.192857919231222
+
+TOTAL cells (sum of cells_total) : 43232
+Global median TSSE               : 1.97
+Global median nFrag              : 1021

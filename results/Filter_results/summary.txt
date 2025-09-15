@@ -1,22 +1,32 @@
 
  =================================================================================
-      Integrated scATAC-seq Cell Filter
-      Version 1.2
+      Integrated scATAC-seq: Filter + Doublet Removal
+      Version 2.2
       (C) 2025 Sohyeong Cho, Janghyun Choi, Junbeom Lee, and Seong Kyu Han*
  =================================================================================
-Filtering Summary
-Generated at: 2025-09-01 12:36:35
+
+===Consolidated Summary (Filter + Doublet Removal)===
+Generated at: 2025-09-15 16:53:05
 
 Parameters
-- Base dir           : examples
-- chrom.sizes (rice) : work/genome.chrom.sizes
-- GTF (rice)         : work/genes.gtf
-- TSS cutoff         : 4.69
-- UMI min/max        : 5000 / 60000
-- Barcode suffix -1  : False
+- Base dir             : /Users/jchoi/Desktop/Test
+- Output root          : /Users/jchoi/singlecell-analysis-pipeline/results/Filter_results
+- chrom.sizes (rice)   : /Users/jchoi/singlecell-analysis-pipeline/refGenome/rice/genome.chrom.sizes
+- GTF (rice)           : /Users/jchoi/singlecell-analysis-pipeline/refGenome/rice/genes.gtf
+- TSS cutoff           : 1.0
+- UMI min/max          : 1000 / 30000
+- 
+- N_FEATURES (per-sample): 250000
+- Strip barcode suffix : False
+- Scanpy fallback      : True
 
-Per-sample summary (pre/post/retention):
-Sample1_test: pre=100  post=30  retention=0.3000
-Sample2_test: pre=200  post=74  retention=0.3700
+A) Filtering (TSSE/UMI): pre → post → retention
+- Sample1_test: 10901 → 8391  (retention=0.7697)
+- Sample2_test: 39709 → 9930  (retention=0.2501)
+TOTAL: 50610 → 18321  (retention=0.3620)
 
-TOTAL: pre=300  post=104  retention=0.3467
+B) Doublet removal (Scrublet): pre → post → retention
+- Sample1_test: 8391 → 7999  (retention=0.9533)
+- Sample2_test: 9930 → 9241  (retention=0.9306)
+TOTAL: 18321 → 17240  (retention=0.9410)
+No valid samples were processed.
