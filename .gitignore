@@ -221,7 +221,3 @@ $RECYCLE.BIN/
 # Linux
 *~
 
-# This project
-examples/*
-results/*
-work/*
