@@ -1,0 +1,87 @@
+###### 9/16 갱신하다가 여전히 임시 : 출력 또는 output file 형식 등 미기입
+
+
+1. 환경 설정
+cd /home/ljb/projects/synEnh/SVM_model/data/
+ 
+ ## /data/pipelines/dsvm/scripts의 스크립트들 cp 이용해서 가져온 후 실행한거라
+ ## 로그가 ./의 상대경로로 남아있는 경우 다수
+
+===============================================================
+
+2. FASTA 파일 생성 
+
+## 상대경로로 했지만 /data/pipelines/dsvm/scripts/pipeline_lsgkm_gpu.sh랑 같음
+## 이 밑으로의 ${BASEDIR} 같은 변수도 해당 스크립트 내에서 지정된 것과 동일
+
+bash ../scripts/pipeline_lsgkm_gpu.sh \ 
+  ./2n_specific.centroid.bed \ ##($1 : input bedfile)
+  300 5 12000 IRGSP 1 
+  
+## $2:PeakLength/2(300=600bp), $3:column(Macs2score)
+## $4:number of top peaks for training
+## $5:genome version : IRGSP for rice, $6:rseed
+  
+===============================================================
+  
+3. 모델 학습 (Positive / Negative 지정)
+
+## pipeline_lsgkm_gpu.sh에서 negfa를 ${expid}.neg${rseed}.fa로 만드는 대신,
+## Negative dataset을 직접 지정하여 만들 수 있게 떼어놓은 부분
+## (posfa도 negfa도 random seed이지만, fasta file의 row수에 맞게 설정하여 랜덤성을 제거)
+## # 4. train model using all data
+## sbatch --export=NONE --dependency=afterany:${jobid1} ${BASEDIR}/scripts/sbatch_gkmtrain.sh -t $T -l $L -k $K -d $D $posfa $negfa $svmid
+## 이라고 되어있기에, 단순히 parameter 가져오고 $posfa $negfa $svmid 부분만 직접 지정하도록 분리한게 전부
+
+BASEDIR=/data/pipelines/dsvm
+T=4
+L=11
+K=7
+D=3
+
+sbatch --export=ALL ${BASEDIR}/scripts/sbatch_gkmtrain.sh \
+  -t $T -l $L -k $K -d $D \
+  ./3n_specific.centroid.t14000.pos1.fa \ 	## $posfa에 해당
+  ./2n_specific.centroid.t14000.neg1.fa \ 	## $negfa에 해당
+  14000_specific.centroid  	## svmid에 해당
+
+===============================================================
+
+4. 5-CrossValidation 
+
+## model performance를 crossvalidation 통해서 검증 가능
+## output -> ${svmid}.cvpred.${rseed}.txt
+
+BASEDIR=/data/pipelines/dsvm
+T=4
+L=11
+K=7
+D=3
+NCV=5
+
+posfa="/home/ljb/projects/synEnh/SVM_model/output/centroid/3n_specific/3n_specific.centroid.t12000.pos1.fa"
+negfa="/home/ljb/projects/synEnh/SVM_model/data/3n_agnostic.t12000.neg1.fa"
+svmid="12000_3n_agnostic.centroid"
+	## -> positive, negative dataset으로 사용할 fasta file 지정, svmid = output file 이름 지정
+	## -> model training에 이용한 대로 fasta file을 지정해, 만든 model performance 확인
+	## ..사실 3.의 부분에서 한번에 둘다 되게 합쳐뒀으면 해결되는 부분이지만..
+	 
+restxt=$(sbatch ${BASEDIR}/scripts/sbatch_gkmtrain.sh \
+  -t $T -l $L -k $K -d $D -x $NCV -i 1 \
+  $posfa $negfa $svmid)
+
+restxtarr=($restxt)
+jobid1=${restxtarr[3]}
+echo $restxt
+
+===============================================================
+
+5. 모델 성능 평가 (AUC)
+
+conda activate SVM_ROC
+
+
+Rscript /data/pipelines/dsvm/scripts/aucn.R \
+  ./*.cvpred.1.txt | \
+  sed 's|./||'
+  
