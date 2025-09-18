@@ -1,0 +1,184 @@
+
+# 1. 환경 설정
+cd /home/ljb/projects/synEnh/SVM_model/data/
+ 
+ ## /data/pipelines/dsvm/scripts의 스크립트들 cp 이용해서 가져온 후 실행한거라
+ ## 로그가 ./의 상대경로로 남아있는 경우 다수
+
+#===============================================================
+
+# 2. FASTA 파일 생성 
+
+## 상대경로로 했지만 /data/pipelines/dsvm/scripts/pipeline_lsgkm_gpu.sh랑 같음
+## 이 밑으로의 ${BASEDIR} 같은 변수도 해당 스크립트 내에서 지정된 것과 동일
+
+bash ../scripts/pipeline_lsgkm_gpu.sh \ 
+  ./2n_specific.centroid.bed \ ##($1 : input bedfile)
+  300 5 12000 IRGSP 1 
+  
+## $2:PeakLength/2(300=600bp), $3:column(Macs2score)
+## $4:number of top peaks for training
+## $5:genome version : IRGSP for rice, $6:rseed
+  
+#===============================================================
+  
+# 3. 모델 학습 (Positive / Negative 지정)
+
+## pipeline_lsgkm_gpu.sh에서 negfa를 ${expid}.neg${rseed}.fa로 만드는 대신,
+## Negative dataset을 직접 지정하여 만들 수 있게 떼어놓은 부분
+## (posfa도 negfa도 random seed이지만, fasta file의 row수에 맞게 설정하여 랜덤성을 제거)
+## # 4. train model using all data
+## sbatch --export=NONE --dependency=afterany:${jobid1} ${BASEDIR}/scripts/sbatch_gkmtrain.sh -t $T -l $L -k $K -d $D $posfa $negfa $svmid
+## 이라고 되어있기에, 단순히 parameter 가져오고 $posfa $negfa $svmid 부분만 직접 지정하도록 분리한게 전부
+
+BASEDIR=/data/pipelines/dsvm
+T=4
+L=11
+K=7
+D=3
+
+sbatch --export=ALL ${BASEDIR}/scripts/sbatch_gkmtrain.sh \
+  -t $T -l $L -k $K -d $D \
+  ./3n_specific.centroid.t14000.pos1.fa \ 	## $posfa에 해당
+  ./2n_specific.centroid.t14000.neg1.fa \ 	## $negfa에 해당
+  14000_specific.centroid  	## svmid에 해당 : output file 이름 지정
+
+#===============================================================
+
+4. 5-CrossValidation 
+
+## model performance를 crossvalidation 통해서 검증 가능
+## output -> ${svmid}.cvpred.${rseed}.txt
+
+BASEDIR=/data/pipelines/dsvm
+T=4
+L=11
+K=7
+D=3
+NCV=5
+
+posfa="/home/ljb/projects/synEnh/SVM_model/output/centroid/3n_specific/3n_specific.centroid.t12000.pos1.fa"
+negfa="/home/ljb/projects/synEnh/SVM_model/data/3n_agnostic.t12000.neg1.fa"
+svmid="12000_3n_agnostic.centroid"
+	## -> positive, negative dataset으로 사용할 fasta file 지정, svmid = output file 이름 지정
+	## -> model training에 이용한 대로 fasta file을 지정해, 만든 model performance 확인
+	## ..사실 3.의 부분에서 한번에 둘다 되게 합쳐뒀으면 해결되는 부분이지만..
+	 
+restxt=$(sbatch ${BASEDIR}/scripts/sbatch_gkmtrain.sh \
+  -t $T -l $L -k $K -d $D -x $NCV -i 1 \
+  $posfa $negfa $svmid)
+
+restxtarr=($restxt)
+jobid1=${restxtarr[3]}
+echo $restxt
+
+#===============================================================
+
+# 5. 모델 성능 평가 (AUC)
+
+conda activate SVM_ROC
+
+
+Rscript /data/pipelines/dsvm/scripts/aucn.R \
+  ./*.cvpred.1.txt | \
+  sed 's|./||'
+
+## 10000_3n_agnostic.centroid.cvpred.1.txt	2000	0.806952124999997
+## 11000_3n_agnostic.centroid.cvpred.1.txt	2200	0.810349173553716
+## 12000_3n_agnostic.centroid.cvpred.1.txt	2400	0.80502109375
+## 13000_3n_agnostic.centroid.cvpred.1.txt	2600	0.799569082840239
+## 14000_3n_agnostic.centroid.cvpred.1.txt	2800	0.787449936224486
+## 14209_3n_agnostic.centroid.cvpred.1.txt	2841	0.789015585010605
+
+#===============================================================
+
+
+# 6. Prediction
+
+##### 해당 $1의 fasta file은 'prediction을 진행할 data'를 담은 file로, 위의 fasta file들과는 무관
+
+## $2의 model을 가지고 $1의 fastă file내 seq에 대해 scoring, 그 결과를 $3파일로 생성
+## $1 : input fasta / $2 : model / $3 : output file 이름 지정
+## output들이 model은 {지정한model이름}.model.txt ,
+## prediction result는 {지정한result이름}.txt 로 생성됨
+## 헷갈릴까봐 result 이름엔 predict_라고 접두사 붙여서 생성했음
+
+sbatch --partition=gpu --account=lab /data/pipelines/dsvm/scripts/sbatch_gkmpredict.sh \
+../output/centroid/3n.TSS.selected/3n.TSS.500.selected.t1850.pos1.fa \
+../output/centroid/3n_specific/model_txt/3n_specific.centroid.t13000.r1.lsgkm.4.11.7.3.model.txt \
+predict_3n_selected_500_model1.txt
+
+## head -n 10 test.txt | cat -A
+## chr1:2923-3522^I0.999944
+## chr1:3159-3758^I0.173684
+## chr1:3372-3971^I0.879868
+## chr1:10596-11195^I1.29719
+## chr1:10911-11510^I-0.414957
+## chr1:11687-12286^I-0.921444
+## chr1:12551-13150^I-0.0962814
+## chr1:16575-17174^I-0.0322609
+## chr1:22653-23252^I0.0259928
+## chr1:26949-27548^I-0.960732
+
+
+
+#===============================================================
+
+	#	file 형식 예시 정리
+
+######################### .bed (bed file)
+
+chr1^I26948^I27548^I3n_rep1_peak_12^I47.41081^I551$
+chr1^I72541^I73141^I3n_rep1_peak_20^I79.923^I600$
+chr1^I141564^I142164^I3n_rep1_peak_38^I75.14559^I592$
+chr1^I147802^I148402^I3n_rep1_peak_41^I28.07682^I566$
+chr1^I163008^I163608^I3n_rep1_peak_43^I93.50644^I557$
+chr1^I172877^I173477^I3n_rep1_peak_46^I38.17868^I600$
+chr1^I185511^I186111^I3n_rep2_peak_57^I35.36523^I591$
+chr1^I256410^I257010^I3n_rep1_peak_72^I244.96362^I594$
+chr1^I308785^I309385^I3n_rep1_peak_82^I79.86362^I553$
+chr1^I332043^I332643^I3n_rep1_peak_88^I41.12269^I564$
+
+######################### .fa (fasta file)
+
+>chr1:26949-27548$
+AAATATACATGACGATATGATCCTGTAAGATATTCTATTCCATTATCCAAAAAAAATGAAATCCCTGCCGTCCGATGCGATGGGCGATGGTAAAACCCTAGCTCGAAGCCAAGCACAGCCTGGGCCGGGCCCGGCCCAGCCCAACAAGTAGTCCGCTGTTATAAAGGGAAGGTAGGCATCTCCCCCCGCGCGCCGCGACTCGTTAGGCTACTCCACCCACTCTTGTTTAGGGTTTCCCTCAGCCGCCGCCGCCGCATCCACGCTCAGCAGCCATGGCGGTGGTCGAGCAGCCGCAGCAGCAGGTGGTGAAGCTCTTCAACTGCTGGTCCTTCGAAGACGTTCAGGTTTGCCTGTCCTCCCATTATACTAGTAAGCAAGTAGGGGTACTCGTCTGGTCTGTCGATAACTCTCGTTGGCGCAGGTGAACGACATATCCCTCGCCGACTACCTCGCGGTGTCCTCGACGAAGCACGCCACCTACCTGCCGCACACGGCTGGCCGCTACTCGGCGAAGCGCTTCCGCAAGGCGCAGTGCCCCCTCGTGGAGCGCCTCACCAACTCCCTCATGATGCACGGCCGCAACAACGGCAAGAAGATCAT$
+$
+>chr1:72542-73141$
+TTTTATAGTCCGTTGGATGCAAATCCAAGGGAAGAAAAAATCTCTCAAAAATCACCCGAGTGATACACAGGCGGTTCCCGTTATATATGGTATTTCGGTTTAAGGATAAATTTGGTAAACTTAATCCAACAACGAATAGTGGGCGTAGGCTTAGGCCTGGGCCTGGTCCTGGTCCTGGTACGGCCCAACAACACGAGAAACAAGTCCCTTTCCCTTGCCCTCTTGTTGAGAGATTTGGGATTTGAGAAGCTGCTGCTGCTCACCTCCCCTCTCCTCCCCACAATCGAATCGAATCGAATCCTCCTCCTCCAGGCTCCAAGCCGAAACCAAACCCTAGCCCCGTCGATCTCCCTCTCCTCGCATGGCGGCTCCCAAGCCCATCTGGGTGCGCCAGGCCGAGGAGGCCAAGCTCAAGTCCGAGGCCGAGACCGCCGCCGCCGCCAAGGCCGCCTTCGACGCCACCTTCAAGGCCCTCTCCGCATCCGCCGCCGACGACCCCGACCAGGACGACGACCTCCACCGCCCCTCTTCCCCGGCCCAAGCCTCTCGGGACGCCTACTCCGACGCAGACGACGACGACGACGACCGCCCCCATGCCCC$
+$
+
+######################### .model.txt (text file of trained model)
+
+svm_type c_svc
+kernel_type wgkm
+L 11
+k 7
+d 3
+norc 0
+M 50
+H 50
+nr_class 2
+total_sv 16395
+rho 0.0990019
+label 1 -1
+nr_sv 8294 8101
+SV
+
+1 CCTTGAACCAAGGAGTCCTCGCTGAGGAAGCTTTGGATCCACGACGCAGCTATGGCCTCCCCGCCCACCAGGCCGCCAGCCACAACCAGCTGACTAGGTAGGCTTCCTAGGTAGGGATCCCATCCCTTCGATTCCCTACTCCCTCCCCCGATTGATTTGATTTGATTTGATTTAATTCGATTGCCTGCTTTTCAGGTCGCATGCATCATCAGATTTCAATCTCCCTTCGTTCCCTGTCCCTAATCCAATACCAATAGGGAGCAATCAGCTGCTCCTCGACGGCGAGGGAGATGTCGTCGGCCGCGGGCCAAGACAACGGAGATACCGCTGGGGACTACATCAAGTGGATGTGCGGCGCCGGTGGCCGTGCGGGCGGCGCCATGGCCAACCTCCAGCGCGGCGTTGGCTCCCTCGTCCGTGACATTGGCGACCCCTGCCTCAACCCATCCCCCGTTAAGGTTCGCCTACTCCTACTCTAGCTCCATATGGATATGGATTCGATTAGCTGTCTACATTCTATGCCATCAATTTGTTTTCCATCACTTCTCATTATACATCTCCATTGCTCTCTAAATTAAGGCTTCTCTAGCTCTATCCTAT
+0.9425739842854296 TTTCAATCTCCCTTCGTTCCCTGTCCCTAATCCAATACCAATAGGGAGCAATCAGCTGCTCCTCGACGGCGAGGGAGATGTCGTCGGCCGCGGGCCAAGACAACGGAGATACCGCTGGGGACTACATCAAGTGGATGTGCGGCGCCGGTGGCCGTGCGGGCGGCGCCATGGCCAACCTCCAGCGCGGCGTTGGCTCCCTCGTCCGTGACATTGGCGACCCCTGCCTCAACCCATCCCCCGTTAAGGTTCGCCTACTCCTACTCTAGCTCCATATGGATATGGATTCGATTAGCTGTCTACATTCTATGCCATCAATTTGTTTTCCATCACTTCTCATTATACATCTCCATTGCTCTCTAAATTAAGGCTTCTCTAGCTCTATCCTATATATATACTAGTACTCCGTATATGATTCTGCTTCATCACTTATTTATTCATCATCATACCGTGAAGCTGTATAAGTCCTGTTATTTGTCATTTGGCATATGTTGTATAGATAACACTTTCAGCCCAGGGACTTTCTATTGCCACTTTTATACATATACAATCAACATTTAGCATATGTATATCCTGTACCGCTCAGTTGTACTGCTGCTTTGA
+1 GTAGAACGTGATAAAGTTAGTGGCAAATCGTAGATGTGTGACAAAGTCAGTGGCATATAATAGGTTGTCCCATGTAATAGAATCTTTCCCTGCCTTAAAAAGAAGTTTGAAAGGGCAAAAGAAAGAGAGAGAGAGAGAATTAATATGTCATCTTATGATTATAATTATATGCCAATCCAACATTCGTGTAAATATAAATATATTTCCATGCCGTAAAAAAGTTTGAAAGGGCTAAAGAAAAAGAGGAGAGAGAGAGAGAGAGAGGGGGGGGGGGGGGCGGGGTGGTGTGGAATTGATGATAGGCCAAAGGTGGTGAGGAAGAATCTGGGTCGTCCAGGCAAGATCCCACGGGCGATGCGAACGAGCACCGGATCCGCTGCGGCTGCTCGGCGTCGGGTCGGAGGTGAGGTCTCGAAACCCTAGCTGCTCCGACGACGATCGTGGCAGCCGCCGTCGCCATGGTGCTGGGAAAGATCGTCATCGTCATCGGCTCCGGTAGGGATCCACTCTCGCGATTTCTGTGCGTCTAATCTGTATGTATAGGGTAGCTTGGCCCAATCCCCCCTCTCTCTCGTTAGCCTCTAGCTCGATTCGCTCCTG
+
+######################### .txt (prediction results of model, about input fasta file)
+
+## chr1:2923-3522^I0.999944
+## chr1:3159-3758^I0.173684
+## chr1:3372-3971^I0.879868
+## chr1:10596-11195^I1.29719
+## chr1:10911-11510^I-0.414957
+## chr1:11687-12286^I-0.921444
+## chr1:12551-13150^I-0.0962814
+## chr1:16575-17174^I-0.0322609
+## chr1:22653-23252^I0.0259928
+## chr1:26949-27548^I-0.960732
+  
