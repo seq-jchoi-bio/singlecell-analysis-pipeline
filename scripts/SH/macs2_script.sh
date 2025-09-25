@@ -10,22 +10,18 @@
 
 set -euo pipefail
 
-# ===== 경로 설정 =====
+# ===== Directories =====
 INPUT_DIR="/home/sohyeong/projects/better_atac_pipeline/output_so/fragments"
 OUTPUT_BASE="/home/sohyeong/projects/better_atac_pipeline/output_so/peakcalling_re"
 LOG_BASE="${OUTPUT_BASE}/_logs_local"
 mkdir -p "$OUTPUT_BASE" "$LOG_BASE"
 
-# ===== Conda 활성화 =====
+# ===== Conda activate =====
 if command -v conda >/dev/null 2>&1; then
-  set +u
   eval "$(conda shell.bash hook)" || true
-  set -u
 fi
-set +u
 source /data/shared/init_conda.sh
 conda activate /data/pipelines/atac_bulk/conda-env
-set -u
 
 if ! command -v macs2 >/dev/null 2>&1; then
   echo "ERROR: macs2 not found in conda env" >&2
@@ -33,26 +29,25 @@ if ! command -v macs2 >/dev/null 2>&1; then
 fi
 echo "macs2 version: $(macs2 --version 2>&1 || true)"
 
-# ===== 실행 함수 =====
+# ===== Run one sample =====
 run_one_sample () {
   local CELLTYPE="$1"
   local i="$2"
-  local SAMPLE="sample${i}"
-  local SAMPLE_NAME="mcluster${CELLTYPE}_${SAMPLE}"
-  local TN5_BED="${INPUT_DIR}/mcluster${CELLTYPE}.${SAMPLE}_fragments.bed"
+  local SAMPLE_NAME="mcluster${CELLTYPE}_sample${i}"
+  local TN5_BED="${INPUT_DIR}/mcluster${CELLTYPE}.sample${i}_fragments.bed"
   local OUTDIR="${OUTPUT_BASE}/${SAMPLE_NAME}/macs2_${SAMPLE_NAME}"
   local LOG_OUT="${LOG_BASE}/${SAMPLE_NAME}.out"
   local LOG_ERR="${LOG_BASE}/${SAMPLE_NAME}.err"
 
-  mkdir -p "$OUTDIR" "$LOG_BASE"
+  mkdir -p "$OUTDIR"
 
   {
     echo "==== [$(date)] START ${SAMPLE_NAME} ===="
-    echo "INPUT  : $TN5_BED"
-    echo "OUTDIR : $OUTDIR"
+    echo "Input : $TN5_BED"
+    echo "Output: $OUTDIR"
 
     if [ ! -s "$TN5_BED" ]; then
-      echo "ERROR: 입력 파일이 없거나 비어있음: $TN5_BED" >&2
+      echo "ERROR: Input file missing or empty: $TN5_BED" >&2
       return 2
     fi
 
@@ -69,14 +64,15 @@ run_one_sample () {
       --buffer-size 1000000 \
       --outdir "$OUTDIR"
 
-    [ -f "$OUTDIR/${SAMPLE_NAME}_treat_pileup.bdg" ] && gzip -f "$OUTDIR/${SAMPLE_NAME}_treat_pileup.bdg" || true
-    [ -f "$OUTDIR/${SAMPLE_NAME}_control_lambda.bdg" ] && gzip -f "$OUTDIR/${SAMPLE_NAME}_control_lambda.bdg" || true
+    for f in "${SAMPLE_NAME}_treat_pileup.bdg" "${SAMPLE_NAME}_control_lambda.bdg"; do
+      [ -f "$OUTDIR/$f" ] && gzip -f "$OUTDIR/$f" || true
+    done
 
     echo "==== [$(date)] DONE  ${SAMPLE_NAME} ===="
   } >"$LOG_OUT" 2>"$LOG_ERR"
 }
 
-# ===== 메인 루프 =====
+# ===== Main loop =====
 declare -a SUCCESS=()
 declare -a FAILED=()
 
@@ -84,8 +80,7 @@ CELLTYPES=("Nervous_Cells" "Endothelial" "Fibroblasts" "Atrial_Cardiomyocytes" "
 
 for CELLTYPE in "${CELLTYPES[@]}"; do
   for i in {1..9}; do
-    SAMPLE="sample${i}"
-    NAME="mcluster${CELLTYPE}_${SAMPLE}"
+    NAME="mcluster${CELLTYPE}_sample${i}"
     echo "[INFO] Running ${NAME}..."
     if run_one_sample "$CELLTYPE" "$i"; then
       echo "[OK] ${NAME} succeeded."
@@ -100,7 +95,7 @@ for CELLTYPE in "${CELLTYPES[@]}"; do
   done
 done
 
-# ===== 요약 출력 =====
+# ===== Summary =====
 echo
 echo "===== SUMMARY ====="
 echo "SUCCESS (${#SUCCESS[@]}): ${SUCCESS[*]:-none}"
