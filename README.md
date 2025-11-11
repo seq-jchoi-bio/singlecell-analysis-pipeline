@@ -1,111 +1,248 @@
 # Single-cell ATAC-seq Integrated Pipeline
-**[[github guide](README_github.md)]**, **[[Logic code manual](bin/README.md)]**
-This repository provides three **command-line wrappers** that serve as main entry points for the single-cell ATAC-seq pipeline.
-Each wrapper reads user arguments, auto-detects input format and reference genomes (Currently, only rice genomes are supported.), and passes configuration to the corresponding logic scripts inside `bin/`.
+*README prepared by Janghyun Choi*
 
-![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python) ![micromamba](https://img.shields.io/badge/micromamba-env-green?logo=anaconda) ![conda-forge](https://img.shields.io/badge/channel-conda--forge-orange?logo=conda-forge) ![snapATAC2](https://img.shields.io/badge/snapATAC2-2.8.0-9cf?logo=rust) ![status](https://img.shields.io/badge/status-developing-yellow)
+This pipeline processes `fragments.tsv.gz` files generated from Cell Ranger (scATAC-seq or scRNA-seq) pipelines, performing sequential quality control, filtering, clustering, and cell-type annotation. It is composed of four **independent wrappers (`run_*.py`)** and their corresponding **logic modules (`bin/...`)**.
+Wrappers manage CLI arguments, parameter injection, and environment setup, while logic modules execute the actual analysis steps.
+
+
+![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python) ![micromamba](https://img.shields.io/badge/micromamba-env-green?logo=anaconda) ![conda-forge](https://img.shields.io/badge/channel-conda--forge-orange?logo=conda-forge) ![snapATAC2](https://img.shields.io/badge/snapATAC2-2.8.0-9cf?logo=rust) ![scanpy](https://img.shields.io/badge/scanpy-1.11.4-9cf?logo=python) ![status](https://img.shields.io/badge/status-stable-green)
+
+---
 
 ## Project Layout
 ```
 singlecell-analysis-pipeline/
-├─ run_qc.py          # Quality Control (Integrated scATAC-seq QC)
-├─ run_filter.py      # Filter + Doublet Removal
-├─ run_annotation.py  # Cell-type Annotation
-└─ bin/               # Logic codes
-   ├─ IntegQC_V8.py
-   ├─ FilterDoublet_V7.py
-   └─ Annot_V5.py
-└─ refGenome/        # Custom reference
-   └─ rice/
-       ├─ chrom.sizes
-       ├─ genes.gtf
-       └─ sigle-cell_marker.csv
-└─ results/
-   ├─ QC_results/             # run_qc.py
-   ├─ Filter_results/         # run_filter.py
-   └─ Annotation_results/     # run_annotation.py
-└─ utils/                     # Other codes and utils
+├─ run_qc.py                    # Wrapper for QC
+├─ run_filter.py                # Wrapper for Filter
+├─ run_clustering.py            # Wrapper for Clustering
+├─ run_finalReport.py           # Wrapper for Annotation
+├─ bin/
+│  ├─ IntegQC.py                # Logic module for QC
+│  ├─ makeQCReport.py           # Logic module for QC
+│  ├─ FilterDoublet.py          # Logic module for Filter
+│  ├─ CLS.py                    # Logic module for Clustering
+│  ├─ postCLS.py                # Logic module for Clustering
+│  ├─ dotplot.py                # Logic module for Clustering
+│  ├─ annotate.py               # Logic module for Annotation
+│  └─ FinalReport.py            # Logic module for Annotation
+├─ refGenome/                   # Custom references
+│  ├─ rice/
+│  │  ├─ genome.chrom.sizes
+│  │  └─ genes.gtf
+│  ├─ hg38/
+│  │  ├─ genome.chrom.sizes
+│  │  └─ genes.gtf
+│  └─ make_ref.sh               # Make custom reference
+├─ results/
+├─ scripts/
+└─ utils/                       # Other codes and utils
 ```
 
-## Output Overview
-Each process stores its results in the `results/` folder.  
+---
 
-| Process | Output folder | Main files (examples) | Description |
-|---------|--------------|------------------------|------------|
-| **QC** | `results/QC_results/` | `fragment_size.png/svg`, `TSSE_violin.png/svg`, `TSSE_grid.png/svg`, `qc_summary(_table).txt/csv` | Fragment-size distributions, TSSE metrics, combined QC plots, and text/csv summary |
-| **Filter + Doublet** | `results/Filter_results/` | `summary.txt`, `<sample>_filtered.csv`, `<sample>_doublets.h5ad`, `merged_doublets.h5ads` | QC tables, filtered cell barcodes, merged h5ad files |
-| **Annotation** | `results/Annotation_results/` | `Plots/*.png/svg`, `bed/*.bed`, `annot_gene_activity.h5ad`, `annot_merged_cells.h5ad`, `annotation_results.csv`, `summary.txt` | cluster annotations, UMAP visualization |
+## Installation & Configuration
 
-> **Note**: `.h5ad` and other large files generated during analysis are automatically placed under these result folders for internal use but are **excluded from the repository** to reduce storage size.
+#### 1) Requirements
+- OS: Linux (recommended)
+- Conda/Mamba: Miniconda or Mambaforge
 
-## Example File
-The example data used in the code are located in the server at **`/data/pipelines/snatac/Example`**.
-This dataset contains a chromosome 1 fragment file from scATAC-seq data, organized as follows:
+#### 2) Environment setup (using `environment.yml`)
 
-```
-/data/pipelines/snatac/Example/
-└── Sample1/
-    └── outs/
-        └── fragments.tsv.gz
-└── Sample2/
-    └── outs/
-        └── fragments.tsv.gz
-```
+Place an `environment.yml` file in the project root.  
 
-## Step 1. Quality Control
-Run QC as follows:
+**Create and activate:**
 ```bash
-python run_qc.py -i <INPUT_DIR> -s rice
+conda env create -f environment.yml -n {env_name}
+conda activate {env_name}
 ```
-Main options:
-- `-mrs {NUMBER}` : Upper bound for fragment-size histogram (default: 1000)
-- `-sl {NUMBER}` : Subsample number of lines for fast preview
-- `-grid {NUMBER}` : Grid rows for plots (default: 3)
-- `-dpi {NUMBER}` : Figure DPI (default: 300)
 
-## Step 2. Filter + Doublet Removal
-Run filtering and doublet detection:
+**Verify installation:**
 ```bash
-python run_filter.py -i <INPUT_DIR> -s rice -tss <float> -min <int> -max <int>
+python -c "import snapatac2 as snap; import anndata, scanpy; import matplotlib, plotly, pandas; print('Environment OK')"
 ```
-> **Note**: Marker genes currently support only CSV and h5ad file formats and are located in the `refGenome/`.
 
-Key options:
-- `-tss {FLOAT}` : TSSE cutoff (default: 1.0)
-- `-min {INT}` : Minimum UMI (default: 500)
-- `-max {INT}` : Maximum UMI (default: 100000)
-- `-feat {INT}` : Number of features for scrublet/kNN graph (default: 250000)
-- `--strip {False/True}` : Strip trailing digits from barcodes (default: False)
+---
 
-## Step 3. Cell-type Annotation
-Run cell-type annotation with reference-based transfer:
+## Step-by-step Manual
+
+> Each wrapper (`run_*.py`) supports its own CLI parameters.  
+> Below is a concise overview of key arguments for each step.  
+> For detailed usage and advanced options, **run each script with the `-h` or `--help` flag**.
+
+### Working Directory Recommendation
+
+- While this pipeline allows **independent specification of input and output paths** for each step, it is **strongly recommended to execute all wrappers from the project root directory**.
+- By default, each wrapper automatically creates the following subdirectories:
+
+```     
+    Root
+    ├─ `QC_results/`
+    ├─ `Filter_results/`
+    ├─ `Annot_results/`
+    └─ `FinalReport.html`
+```
+
+- These directories are referenced internally by downstream scripts (e.g., plotting, report generation, summary merging).
+- Running all steps from a single root ensures that file paths remain consistent and that the final report and auxiliary analyses function correctly.
+
+---
+
+### Step 1 — Quality Control (QC)
+
+**Purpose:**  
+Generate fragment-size distributions (FSD), TSSE metrics, and per-sample QC grids.  
+Output summary tables and an optional HTML report.
+
+**Input:**  
+- `<sample>/outs/fragments.tsv.gz` automatically detected.  
+- Reference files: `chrom.sizes`, `genes.gtf` 
+> **If a user’s reference genome is not available,**
+this pipeline allows converting the gtf and fasta files used in Cell Ranger into a compatible format for direct use.
+**To build a custom reference,** refer to `refGenome/README,md` or use the `-h` flag of `refGenome/make_ref.sh`.
+
+**Core parameters:**
+| Parameter | Description |
+|------------|--------------|
+| `-i`, `--input` | Base directory containing sample folders with `outs/fragments.tsv.gz`. |
+| `-o`, `--outdir` | Output directory (default: `./QC_results`). |
+| `-s`, `--species` | Species ID for locating `refGenome/<species>/genes.gtf` and `genome.chrom.sizes`. |
+| `-j`, `--n-jobs` | Number of parallel threads. |
+
+> See `python run_qc.py -h` for the complete argument list.
+
+**Output:**  
+- `QC_results/` with PNG/SVG plots, text summaries, and optional HTML report.
+
+**Example:**  
 ```bash
-python run_annotation.py -i <INPUT_DIR> -s rice
+python run_qc.py -i ./data -s hg38 -j 10
 ```
-Key options:
-- `--label {KEY}` : Map to REF_LABEL_KEY (default: celltype_id)
-- `--log2fc {FLOAT}` : Min log2 fold-change for marker genes (default: 0.5)
-- `--pval {FLOAT}` : Max adjusted p-value (default: 0.05)
-- `--markerSet {INT}` : Min markers per set (default: 5)
-- `--feat {INT}` : Number of features (default: 250000)
-- `--neigh {INT}` : Number of neighbors (default: 10)
-- `--dim {INT/None}` : Spectral dimensions to use (default: None)
-- `--matrix {True/False}` : Generate gene activity matrix (default: True)
-- `--mode {auc/weighted}` : Transfer mode (default: auc)
-- `--coreTh {FLOAT}` : Confidence threshold (default: 0.5)
-- `--umap {True/False}` : Save UMAP plot (default: True)
-- `--umapCount {INT}` : Min count per UMAP label (default: 20)
-- `--umapLabel {True/False}` : Outline labels on UMAP (default: True)
 
-## General Notes
-- All wrappers require `-i` (input directory) and `-s` (species).
-- Species auto-detection supports `rice` and can be extended to other genomes by adding folders under `refGenome/`.
-- If an argument is omitted, each wrapper falls back to the default value **defined in the logic scripts** inside `bin/`.
+---
+
+## Step 2 — Filtering and Doublet Removal
+
+**Purpose:**  
+Perform TSSE/UMI-based filtering and Scrublet doublet detection.
+
+**Input:**  
+- `<sample>/outs/fragments.tsv.gz` automatically detected.  
+- Reference files: `chrom.sizes`, `genes.gtf`
+
+**Core parameters:**
+| Parameter | Description |
+|------------|--------------|
+| `-i`, `--input` | Input directory or h5ad file from Step 1. |
+| `-s`, `--species` | Reference species (for GTF/chrom.sizes lookup) from Step 1. |
+| `--tss` | Minimum TSS enrichment threshold. |
+| `--min`, `--max` | Min/Max fragment counts per cell. |
+| `-j`, `--n-jobs` | Threads for filtering and Scrublet. |
+
+> See `python run_filter.py -h` for details.
+
+**Output:**  
+- `Filter_results/` folder with filtered data (`*.h5ad/h5ads`) and `summary.txt`.
+
+**Example:**  
+```bash
+python run_filter.py -i ./data -s hg38 -tss 10.0 -min 5000 -max 100000
+```
+
+---
+
+## Step 3 — Clustering
+
+**Purpose:**  
+Conduct feature selection, spectral embedding, Harmony integration, Leiden clustering, and UMAP visualization.
+
+**IMPORTANT!!**
+- This pipeline does not rely on the automatic `snap.tl.make_gene_matrix()` function of SnapATAC.
+- Instead, it directly processes the input reference genome (GTF and chrom.sizes) to build the gene-activity matrix,
+enabling compatibility with custom or non-model species.
+
+**Input:**  
+- `Filter_results/merged_doublets.h5ads` automatically detected.  
+- Reference files: `chrom.sizes`, `genes.gtf`
+- Marker genes: A `csv` file containing marker genes. **The file must include the headers `type` and either `gene_id` or `gene_name`.**
+
+**Core parameters:**
+| Parameter | Description |
+|------------|--------------|
+| `-i`, `--input` | Input h5ads file (auto-detected obtained from Step 2). |
+| `-s`, `--species` | Reference genome from Step 1. |
+| `-r`, `--markers` | Marker gene list as a csv format. |
+
+> See `python run_clustering.py -h` for advanced options.
+
+**Output:**  
+- All results are saved under the automatically generated directory `Annot_results/` in the current working folder.
+- `Annot_results/plots/`: UMAP plots and coordinate data.
+- `Annot_results/clustered.h5ad`: Cluster-level feature matrix.
+- `Annot_results/annot_gene_activity.h5ad`: Matrix combining clustering and Leiden information.
+- `Annot_results/dotplots/`: Dotplot figures and numerical data tables.
+
+**Example:**  
+```bash
+python run_clustering.py -i ./ -s hg38 -r humanMarker.csv
+```
+
+---
+
+## Step 4 — Annotation and Final Report
+
+**Purpose:**  
+Perform marker-based annotation, update the annotated h5ad file with cell-type information, and export BED files per cell type, followed by generating a unified final report that integrates the dotplot, label map, and UMAP.
+
+**Input:**  
+- `QC_results/summary.txt`  
+- `Filter_results/summary.txt`  
+- `Annot_results/plots/umap.csv`  
+- `Annot_results/dotplots/*.csv`  
+- **Key input**: **`Annot_results/dotplots/label_map.csv`**
+> - This file plays a critical role in the annotation process.
+> - During **Step 3**, Leiden clusters are automatically mapped to cell types based on marker-pattern signatures a method conceptually similar to `scanpy.tl.score_genes`.
+> - The resulting label_map.csv file contains two columns: leiden and type.
+> - **If the automatic assignment does not match the user’s interpretation,**
+the type column can be manually edited to redefine the cell-type labels for each Leiden cluster.
+> - **Step 4** directly uses this updated label_map.csv to perform annotation,
+making this file the **central bridge between automated scoring and user-defined curation** in the pipeline.
+
+**Core parameters:**
+| Parameter | Description |
+|------------|--------------|
+| `-i`, `--input` | Base root project directory (with `Annot_results/` and `Filter_results/`). |
+| `-r`, `--marker` | Optional marker gene CSV for generating report. |
+| `-n`, `--name` | Custom report name (optional, default: `FinalReport.html`). |
+
+> See `python run_AnnotReport.py -h` for CLI reference.
+
+**Output:**  
+- `Annot_results/update_h5ad/`: Update the filtered h5ad file with cell-type information/
+- `Annot_results/bed/`: Export bed files per cell-type.
+- `./FinalReport.html`: Integrated HTML report (full embeded).
+
+**Example:**  
+```bash
+python run_AnnotReport.py -i ./ -r humanMarker.csv -n HumanData.html
+```
+
+---
 
 ## Version & Authorship
 
-- Logic and wrapper versions: `IntegQC_V8 (version 2.2)`, `FilterDoublet_V7 (version 2.2)`, `Annot_V5 (version 2.8)`
-- Wrapper version: 1.0
-- Copyright (C) 2025 Sohyeong Cho, Janghyun Choi, Junbeom Lee, and Seong Kyu Han*
+| Step | Wrapper |  Logic Module(s) | Version |
+|------|----------|----------------|----------|
+| **1 – QC process** | `run_qc.py` | `bin/IntegQC.py`, `bin/makeQCReport.py` | v2.2 |
+| **2 – Filter/Doublet** | `run_filter.py` | `bin/FilterDoublet.py` | v3.0 |
+| **3 – Clustering** | `run_clustering.py` | `bin/CLS.py`, `bin/postCLS.py`, `bin/dotplot.py` | v1.3 |
+| **4 – Annotation/Report** | `run_AnnotReport.py` | `bin/annotate.py`, `bin/FinalReport.py` | v4.0 |
 
-Please file issues or pull requests for enhancements.
+**Main Developer and Code Architect:**  
+- Janghyun Choi, Ph.D. — implemented the main pipeline modules and designed major functional components.
+
+**Project Supervisor:**
+- Seong Kyu Han, Ph. D. — provided conceptual guidance and overall project supervision.
+
+**Contributors:**  
+- Sohyeong Cho — contributed to code implementation, module development, and pipeline testing.  
+- Junbeom Lee – supported data processing, logic refinement, and validation.
