@@ -92,8 +92,8 @@ for bed in "${BED_FILES[@]}"; do
 
   echo "[RUN] macs2 for ${bn} -> ${sub_out}"
   macs2 callpeak -n "${sample}" \
-    -g "${gsize}" --nomodel --nolambda \
-    --shift -75 --extsize 150 \
+    -g "${gsize}" --nomodel \
+    --shift -50 --extsize 100 \
     --keep-dup all -f BED -t "${bed}" \
     -B --SPMR --call-summits \
     --buffer-size 1000000 \
