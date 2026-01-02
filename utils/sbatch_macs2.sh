@@ -95,7 +95,7 @@ for bed in "${BED_FILES[@]}"; do
     -g "${gsize}" --nomodel \
     --shift -50 --extsize 100 \
     --keep-dup all -f BED -t "${bed}" \
-    -B --SPMR --call-summits \
+    -B --SPMR \
     --buffer-size 1000000 \
     --outdir "${sub_out}"
 
